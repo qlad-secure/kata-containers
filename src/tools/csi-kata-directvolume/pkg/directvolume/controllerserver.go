@@ -100,7 +100,7 @@ func (dv *directVolume) CreateVolume(ctx context.Context, req *csi.CreateVolumeR
 
 		// A retried CreateVolume may follow a failure between recording the
 		// volume and allocating its backing device, so allocate again.
-		if volumeCtx[utils.KataContainersDirectVolumeType] == utils.DirectVolumeTypeName {
+		if volumeCtx[utils.KataContainersDirectVolumeType] != utils.SpdkVolumeTypeName {
 			if err := dv.ensureDirectBackingDevice(&exVol); err != nil {
 				return nil, err
 			}
@@ -419,3 +419,4 @@ func (dv *directVolume) ControllerExpandVolume(ctx context.Context, req *csi.Con
 
 	return &csi.ControllerExpandVolumeResponse{}, nil
 }
+
