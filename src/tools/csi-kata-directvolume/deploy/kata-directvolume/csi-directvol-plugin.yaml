@@ -26,11 +26,10 @@ spec:
       serviceAccountName: csi-provisioner
       containers:
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v3.6.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v6.4.0
           args:
             - -v=3
             - --csi-address=/csi/csi.sock
-            - --feature-gates=Topology=true
             - --node-deployment=true
             - --strict-topology=true
             - --immediate-topology=false
@@ -61,7 +60,7 @@ spec:
               name: socket-dir
 
         - name: node-driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.9.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.18.0
           args:
             - --v=3
             - --csi-address=/csi/csi.sock
@@ -87,7 +86,7 @@ spec:
 
         - name: kata-directvolume
           # build and push it into registry
-          image: localhost/kata-directvolume:v1.0.19
+          image: rtim/csi-kata-directvolume:4.2.0
           args:
             - --drivername=directvolume.csi.katacontainers.io
             - --v=5
@@ -95,14 +94,15 @@ spec:
             - --statedir=$(STATE_DIR)
             - --storagepath=$(STORAGE_POOL)
             - --nodeid=$(KUBE_NODE_NAME)
-            - --spdk-rawpath=$(RAW_DISKS)
-            - --spdk-vhostpath=$(VHU_UDS_PATH)
-            - --spdk-rpc-timeout=10s
+            # Startup initializes these paths even for non-SPDK volumes.
+            # Use unused directories inside the existing state mount.
+            - --spdk-rawpath=/csi-persist-data/spdk/rawdisks
+            - --spdk-vhostpath=/csi-persist-data/spdk/vhost
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
             - name: STORAGE_POOL
-              value: /tmp/kata-directvol-storages
+              value: /var/lib/kata-directvolume/volumes
             - name: STATE_DIR
               value: /csi-persist-data
             - name: KUBE_NODE_NAME
@@ -110,10 +110,6 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-            - name: RAW_DISKS
-              value: /var/lib/spdk/rawdisks
-            - name: VHU_UDS_PATH
-              value: /var/lib/spdk/vhost
           securityContext:
             privileged: true
           ports:
@@ -142,26 +138,17 @@ spec:
             - mountPath: /dev
               name: dev-dir
             # backend block file stored at storage-pool
-            - mountPath: /tmp/kata-directvol-storages
+            - mountPath: /var/lib/kata-directvolume/volumes
               name: storage-pool
             # direct volume mountInfo.json stored at shared-directvols
             - mountPath: /run/kata-containers/shared/direct-volumes
               name: shared-directvols
-            # vhost-user socket
-            - mountPath: /var/lib/spdk/vhost
-              name: vhost-dir
-            # rawdisks
-            - mountPath: /var/lib/spdk/rawdisks
-              name: rawdisks-dir
-            # spdk socket
-            - mountPath: /var/tmp
-              name: spdk-dir
 
         - name: liveness-probe
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
-          image: registry.k8s.io/sig-storage/livenessprobe:v2.8.0
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.20.0
           args:
           - --csi-address=/csi/csi.sock
           - --health-port=9898
@@ -194,7 +181,7 @@ spec:
           name: dev-dir
         # kata-containers backend rawblock stored there.
         - hostPath:
-            path: /tmp/kata-directvol-storages
+            path: /var/lib/kata-directvolume/volumes
             type: DirectoryOrCreate
           name: storage-pool
         # kata-containers direct volumes stored there.
@@ -202,20 +189,4 @@ spec:
             path: /run/kata-containers/shared/direct-volumes/
             type: DirectoryOrCreate
           name: shared-directvols
-        # vhost there.
-        - hostPath:
-            path: /var/lib/spdk/vhost
-            type: Directory
-          name: vhost-dir
-        # rawdisk there.
-        - hostPath:
-            path: /var/lib/spdk/rawdisks
-            type: DirectoryOrCreate
-          name: rawdisks-dir
-        # spdk socket stored there.
-        - hostPath:
-            path: /var/tmp
-            type: Directory
-          name: spdk-dir
-
 

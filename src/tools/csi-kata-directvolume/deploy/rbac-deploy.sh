@@ -74,7 +74,9 @@ eval original="\${${component}_RBAC_YAML}"
 
 # shellcheck disable=SC2154
 if [[ "${current}" =~ ^http:// ]] || [[ "${current}" =~ ^https:// ]]; then
-    run curl "${current}" --output "${TEMP_DIR}"/rbac.yaml --silent --location
+    run curl "${current}" --output "${TEMP_DIR}"/rbac.yaml --fail --show-error --silent --location
+else
+    run cp "${current}" "${TEMP_DIR}"/rbac.yaml
 fi
 
 # replace the default namespace with specified namespace kata-directvolume

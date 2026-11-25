@@ -2,9 +2,24 @@
 
 ## How to Deploy Kata Direct Volume CSI
 
-First, you need to make sure you have a healthy Kubernetes(1.20+) cluster and have the permissions to create Kata pods.
+First, ensure you have a healthy Kubernetes 1.34+ cluster and permission to create Kata pods.
+The bundled external provisioner requires Kubernetes 1.34 or newer.
 
-*WARNING* If you select a `K8S` with lower version, It cannot ensure that it will work well.
+The deployment pins these standard CSI sidecars:
+
+| Component | Version |
+| --- | --- |
+| `csi-provisioner` | `v6.4.0` |
+| `csi-node-driver-registrar` | `v2.18.0` |
+| `livenessprobe` | `v2.20.0` |
+
+`deploy/rbac-deploy.sh` fetches provisioner RBAC from the matching image tag and adjusts its namespace.
+When overriding `CSI_PROVISIONER_TAG`, regenerate RBAC with the same tag before deploying.
+The obsolete `Topology` feature gate is not needed; retain node deployment and strict topology for node-local storage.
+These sidecar upgrades do not change the Direct Volume driver's storage behavior or validate persistence.
+
+For k3s, verify the kubelet data directory and set `KUBELET_DATA_DIR` if it differs from `/var/lib/kubelet`.
+Keep the existing backing-storage paths when upgrading an installation with data.
 
 The `CSI driver` is deployed as a `daemonset` and the pods of the `daemonset` contain 4 containers:
 
@@ -13,14 +28,15 @@ The `CSI driver` is deployed as a `daemonset` and the pods of the `daemonset` co
 3. [CSI-Liveness-Probe](https://github.com/kubernetes-csi/livenessprobe)
 4. [CSI-Node-Driver-Registrar](https://github.com/kubernetes-csi/node-driver-registrar)
 
-The easiest way to deploy the `Direct Volume CSI driver` is to run the `deploy.sh` script for the Kubernetes version used by
-the cluster as shown below for Kubernetes 1.28.2.
+To deploy the `Direct Volume CSI driver`, first build and publish the driver image and update its image reference in
+`deploy/kata-directvolume/csi-directvol-plugin.yaml`. Then run `deploy.sh` on a supported cluster:
 
 ```shell
 sudo deploy/deploy.sh
 ```
 
-You'll get an output similar to the following, indicating the application of `RBAC rules` and the successful deployment of `csi-provisioner`, `node-driver-registrar`, `kata directvolume csi driver`(`csi-kata-directvol-plugin`), liveness-probe. Please note that the following output is specific to Kubernetes 1.28.2.
+The following historical output illustrates deployment on Kubernetes 1.28.2 with older sidecars.
+Current deployments require Kubernetes 1.34+ and use the versions listed above.
 
 ```shell
 Creating Namespace kata-directvolume ...
